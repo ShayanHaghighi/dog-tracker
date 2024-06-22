@@ -3,10 +3,9 @@ import requests
 import os
 import logging
 from dotenv import load_dotenv, find_dotenv
-from PIL import Image
-from ultralytics import YOLO
+from vision import find_dog
+from interactiveCLUI import select_option
 
-model = YOLO('yolov8n.pt')
 
 open('rtsp.log', 'w').close()
 logger = logging.getLogger(__name__)
@@ -22,7 +21,8 @@ client_secret = os.getenv('CLIENT_SECRET')
 old_rtsp_urls = os.getenv('OLD_RTSP_URLS').split(',')
 logger.info("Loaded env variables")
 
-
+def load_env():
+    pass
 
 def set_env_var(key:str, value:str) -> None:
     dotenv_path = find_dotenv()
@@ -47,7 +47,7 @@ def set_env_var(key:str, value:str) -> None:
             if not variable_exists:
                 file.write(f'{key}={value}\n')
 
-def refresh_access_token():
+def refresh_access_token() -> None:
     url = 'https://www.googleapis.com/oauth2/v4/token'
     params = {
         'client_id' : client_id,
@@ -66,7 +66,7 @@ def refresh_access_token():
     return new_token
 
 
-def send_RTSP_request(access_token:str,device_id:str):
+def send_RTSP_request(access_token:str,device_id:str) -> str:
     url = 'https://smartdevicemanagement.googleapis.com/v1/enterprises/' + project_id + '/devices/' + device_id + ':executeCommand'
     headers = {
         'Content-Type' : 'application/json',
@@ -82,7 +82,7 @@ def send_RTSP_request(access_token:str,device_id:str):
     return r
 
 
-def get_RTSP_url(device_id:str):
+def get_RTSP_url(device_id:str) -> None:
     global access_token
     r = send_RTSP_request(access_token,device_id)
     if r.reason == "Unauthorized":
@@ -99,15 +99,23 @@ def get_RTSP_url(device_id:str):
 
     return response_dict['results']['streamUrls']['rtspUrl']
 
-def show_livestream(device_id:str,idx:int):
-
-    logger.info("Capturing Stream %d",idx)
+# gets the stream for a particular device
+def getStream(device_id:str, idx:int):
     cap = cv2.VideoCapture(old_rtsp_urls[idx])
     if not cap.isOpened():
         logger.info("RTSPS URL expired - retrieving new url")
         rtsps_url = get_RTSP_url(device_id)
         old_rtsp_urls[idx] = rtsps_url
         cap = cv2.VideoCapture(rtsps_url)
+    
+    return cap
+
+# searches for a dog in the livestream for a particular device
+def search_stream(device_id:str, idx:int) -> None:
+
+    logger.info("Capturing Stream %d",idx)
+    
+    cap = getStream(device_id,idx)
 
     if not cap.isOpened():
         logger.info("Error: Couldn't open stream.")
@@ -120,60 +128,34 @@ def show_livestream(device_id:str,idx:int):
                 logger.info("Failed to retrieve frame.")
                 return
             smaller_frame = cv2.resize(frame, (0,0),fx=0.5,fy=0.5)
-            results = model(smaller_frame)
-            result = results[0]
-
-            # print(result.boxes)
-            # im_bgr = result.plot()
-            # im_rbg = Image.fromarray(im_bgr[::-1])
-            # result.show()
-            # return
-            boxes = result.boxes.xyxy  
-            class_ids = result.boxes.cls 
-            scores = result.boxes.conf 
-
-            print(class_ids)
-            
-            DOG_ID = 16.
-
-            mask = (class_ids == DOG_ID)
-
-            filtered_class_ids = class_ids[mask]
-            filtered_boxes = boxes[mask]
-            filtered_scores = scores[mask]
-
-            
-            for box in filtered_boxes:
-                x1, y1, x2, y2 = map(int, box)
-                cv2.rectangle(smaller_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
+            find_dog(smaller_frame)
             cv2.imshow('RTSPS Stream', smaller_frame)
 
             while True:
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    # break
-
                     cap.release()
                     cv2.destroyAllWindows()
                     break
 
-def show_all_streams():
-    # show_livestream(device_id=device_ids[3],idx=3)
-    # return
-
-    for idx,device_id in enumerate(device_ids):
-        show_livestream(device_id,idx)
-
+# updates the values in .env file
+def update_rtsp_env() -> None:
     url_string = ""
-
     for url in old_rtsp_urls:
         url_string += url + ','
+    set_env_var('OLD_RTSP_URLS',url_string[:-1])
 
-    url_string = url_string[:-1]
+def search_all_streams() -> None:
 
-    set_env_var('OLD_RTSP_URLS',url_string)
+    for idx,device_id in enumerate(device_ids):
+        search_stream(device_id,idx)
+
+    update_rtsp_env()
 
     
-
-# show_livestream()
-show_all_streams()
+if __name__=='__main__':
+    answer,_ = select_option("which device do you want to access?",["All","One specific one"])
+    if answer == "All":
+        search_all_streams()
+    else:
+        answer,idx = select_option("which room do you want to access?",["1","2","3","4","5",])
+        search_stream(device_id=device_ids[idx],idx=idx)
