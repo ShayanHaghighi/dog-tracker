@@ -1,0 +1,33 @@
+{
+  "logFileHighlighter.customPatterns": [
+    {
+      "pattern": "(INFORMATION|INFO|INF|info)", // more specific works best
+
+      // to restrict with a positive lookahead of the ] character
+      // "pattern": "(INFORMATION|INFO|INF|info)(?=\\])",
+      "foreground": "#22aa22"
+    },
+    {
+      "pattern": "[0-9]{4}\\/[0-9]{2}\\/[0-9]{2}.*?(?=\\|)", // more specific works best
+
+      "foreground": "#5e5caa"
+    },
+    {
+      "pattern": "(?<=\\|.*?\\|)(.*?)(?=\\|)", // more specific works best
+
+      "foreground": "#ce64ff"
+    },
+    {
+      "pattern": "(ERROR|ERR).*",
+      "foreground": "#f00"
+    },
+    {
+      "pattern": "(WARNING|DBG)",
+      "foreground": "#ffd562"
+    },
+    {
+      "pattern": "(DEBUG|DBG).*",
+      "foreground": "#888888"
+    }
+  ]
+}

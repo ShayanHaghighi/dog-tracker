@@ -1,5 +1,7 @@
 # .gitignore
 __pycache__/
-.env
-*.log
+log/
+cfg/
+env/
 yolov8n.pt
+examples/
