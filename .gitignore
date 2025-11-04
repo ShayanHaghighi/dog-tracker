@@ -5,3 +5,5 @@ cfg/
 env/
 yolov8n.pt
 examples/
+.idea/
+.vscode/

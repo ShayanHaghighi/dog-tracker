@@ -1,38 +1,46 @@
 from flask import Flask, request
-from .logger import Logger
-from .clients.imageURLClient import ImageUrlClient
-from .push_event import PushEvent
-from .clients.imageProcessClient import process_image
+from .utils.logger import Logger
+from .api.imageURLClient import ImageUrlClient
+from .api.push_event import PushEvent
+from .api.imageProcessClient import process_image
+from .vision.vision import visionClient
 
-logger = Logger('app')
+logger = Logger("app")
 
 app = Flask(__name__)
 
 # https://cool-naturally-hagfish.ngrok-free.app/nest-webhook
 
 
-@app.route('/nest-webhook', methods=['POST'])
+@app.route("/nest-webhook", methods=["POST"])
 def handle_event():
+    try:
+        event = PushEvent(request)
+        url, event_id, device_name = event.parse()
 
-    event = PushEvent(request)
-    url,event_id,device_name = event.parse()
-    
-    if event.skip_event():
-        return '',204
-    
-    urlClient = ImageUrlClient(url,event_id)
-    url,token,error_msg = urlClient.get_response()
+        if event.skip_event():
+            return "", 204
 
-    if error_msg:
-        logger.error(error_msg)
-        return '',204
-    
+        urlClient = ImageUrlClient(url, event_id)
+        url, token, error_msg = urlClient.get_response()
 
-    process_image(url,token,device_name)
+        if error_msg:
+            logger.error(error_msg)
+            return "", 204
 
-    
-    return '', 204  # Acknowledge the message
+        process_image(url, token, device_name)
+    except KeyError as e:
+        logger.error(e)
+
+    return "", 204  # Acknowledge the message
+
+
+@app.route("/reload", methods=["POST"])
+def reload_models():
+    visionClient.load_models()
+    return "", 204
+
 
 if __name__ == "__main__":
-    logger.info('Server Starting...')
-    app.run(port=8080)
+    logger.info("Server Starting...")
+    app.run(port=8081)
